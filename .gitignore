@@ -1,0 +1,26 @@
+# Binaries
+/ethtool_exporter
+/ethtool_exporter-*
+*.exe
+*.test
+*.out
+
+# Go
+coverage.out
+coverage.html
+*.prof
+*.pprof
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local secrets / deploy
+/web-config.yml
+*.pem
+*.key
+.env
+.env.*

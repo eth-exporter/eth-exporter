@@ -1,0 +1,17 @@
+eth-exporter
+Copyright 2026 Scott Mo
+
+This product is licensed under MIT No Attribution (MIT-0). See LICENSE.
+
+This repository vendors third-party Go modules under the vendor/ directory.
+Those modules remain under their respective licenses (typically Apache-2.0,
+MIT, or BSD). See each module’s LICENSE (or equivalent) file inside vendor/
+for details. Notable direct dependencies include:
+
+  - github.com/prometheus/client_golang
+  - github.com/prometheus/exporter-toolkit
+  - golang.org/x/sys
+
+Linux kernel UAPI constants and wire formats for ethtool/netlink are used
+as published by the Linux kernel project; this software does not link against
+the upstream ethtool userspace binary.

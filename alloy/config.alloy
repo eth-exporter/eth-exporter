@@ -1,0 +1,31 @@
+// Grafana Alloy scrape example for ethtool_exporter.
+// Assumes the exporter listens on localhost:9417.
+
+prometheus.scrape "ethtool" {
+	targets = [{
+		__address__ = "127.0.0.1:9417",
+		job         = "ethtool",
+		instance    = env("HOSTNAME"),
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	scrape_interval = "15s"
+	scrape_timeout  = "10s"
+	metrics_path    = "/metrics"
+}
+
+// Optional: discover many hosts via file SD instead of a fixed target.
+// prometheus.scrape "ethtool_fleet" {
+//   targets    = discovery.file.ethtool.targets
+//   forward_to = [prometheus.remote_write.default.receiver]
+//   scrape_interval = "30s"
+// }
+//
+// discovery.file "ethtool" {
+//   files = ["/etc/alloy/ethtool_targets.json"]
+// }
+
+prometheus.remote_write "default" {
+	endpoint {
+		url = "https://prometheus.example.com/api/v1/write"
+	}
+}
