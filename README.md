@@ -1,5 +1,10 @@
+<p align="center">
+  <img src="docs/images/eth-exporter.png" alt="eth-exporter logo" width="200">
+</p>
+
 # eth-exporter
 
+[![CI](https://github.com/eth-exporter/eth-exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/eth-exporter/eth-exporter/actions/workflows/ci.yml)
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-lightgrey.svg)](LICENSE)
 
 Prometheus / Grafana Alloy exporter for Linux network interfaces.
@@ -20,7 +25,15 @@ It reads **only from the kernel** — no `ethtool` CLI, `lldpd`, `ip`, SNMP, or 
 | **rtnetlink** | Addresses, permanent MAC, ARP/ND, bridge FDB, XDP attach, TC qdisc stats |
 | **AF_PACKET** | Passive LLDP and CDP neighbor discovery |
 
-The binary is named `ethtool_exporter` (Prometheus exporter convention). This repository is self-contained: Go module dependencies are **vendored** under [`vendor/`](vendor/).
+The binary is named `ethtool_exporter` (Prometheus exporter convention). This repository is self-contained: Go module dependencies are **vendored** under [`vendor/`](vendor/), and it ships everything needed to monitor a fleet:
+
+| Asset | Path |
+|-------|------|
+| Prometheus scrape config, recording rules, alerts (with unit tests) | [`prometheus/`](prometheus/) |
+| Grafana Alloy configs (per-host agent and central fleet scraper) | [`alloy/`](alloy/) |
+| Grafana dashboards (JSON) and provisioning | [`grafana/`](grafana/) |
+| systemd unit, no-neighbor drop-in, TLS/auth example | [`systemd/`](systemd/) |
+| Dockerfile and single-host demo stack | [`Dockerfile`](Dockerfile), [`compose/`](compose/) |
 
 ## Requirements
 
@@ -30,12 +43,15 @@ The binary is named `ethtool_exporter` (Prometheus exporter convention). This re
 
 ## Quick start
 
+Download a release archive from [GitHub Releases](https://github.com/eth-exporter/eth-exporter/releases) (static Linux `amd64` / `arm64` binaries, with and without neighbor capture, plus all configs and dashboards), or build from source:
+
 ```bash
-git clone https://github.com/scottmo/eth-exporter.git
+git clone https://github.com/eth-exporter/eth-exporter.git
 cd eth-exporter
 make build          # uses -mod=vendor (offline-friendly)
 ./ethtool_exporter  # listens on 127.0.0.1:9417 by default
 curl -sS http://127.0.0.1:9417/metrics | head
+./ethtool_exporter --version
 ```
 
 Cross-compile for Linux from macOS/Windows:
@@ -65,17 +81,59 @@ systemctl daemon-reload && systemctl enable --now ethtool_exporter
 
 See [docs/INSTALL.md](docs/INSTALL.md) for containers, Alloy, and hardening details.
 
+## Monitoring setup
+
+### Prometheus
+
+[`prometheus/prometheus.yml`](prometheus/prometheus.yml) scrapes the local exporter, picks up additional hosts from [`prometheus/targets/`](prometheus/targets/ethtool.yml.example) (file SD), strips `:9417` from `instance`, and loads:
+
+- [`rules/ethtool.rules.yml`](prometheus/rules/ethtool.rules.yml) — recording rules for throughput, utilization, errors, drops, FEC, softnet, conntrack, and TCP retransmits
+- [`rules/ethtool.alerts.yml`](prometheus/rules/ethtool.alerts.yml) — alerts for exporter health, interface down / flapping / errors / overruns / saturation, bond members, FEC, optical RX power and temperature, conntrack, softnet drops, and TCP retransmits
+
+```bash
+promtool check config prometheus/prometheus.yml
+promtool test rules prometheus/rules/tests/*.yml
+```
+
+### Grafana Alloy
+
+- [`alloy/config.alloy`](alloy/config.alloy) — Alloy on each host scrapes `127.0.0.1:9417` and `remote_write`s to Prometheus / Mimir / Grafana Cloud (recommended; the exporter stays loopback-only).
+- [`alloy/fleet.alloy`](alloy/fleet.alloy) — one central Alloy scrapes many hosts over HTTPS with basic auth, using the same file-SD targets format.
+
+Both set `job="ethtool"` and a hostname `instance`, matching the dashboards and alerts. Load the rule files into your Mimir / Prometheus ruler (for example `mimirtool rules load prometheus/rules/*.yml`).
+
+### Grafana dashboards
+
+Import the JSON files from [`grafana/dashboards/`](grafana/dashboards/) (**Dashboards → New → Import**, then pick your Prometheus data source), or provision them with [`grafana/provisioning/`](grafana/provisioning/). Each dashboard has `Data source`, `Job`, `Instance`, and `Interface` variables and links to the others.
+
+| Dashboard | Contents |
+|-----------|----------|
+| [Overview](grafana/dashboards/ethtool-overview.json) | Targets, interface state, throughput, packets, utilization, errors, drops, carrier changes, interface and NIC inventory, exporter health |
+| [Physical layer & optics](grafana/dashboards/ethtool-physical.json) | Link settings, link-down events, transceiver DOM (power, temperature, bias, voltage, per lane), FEC, pause, IEEE/RMON counters, `ethtool -S` explorer, rings / channels / coalescing |
+| [Topology](grafana/dashboards/ethtool-topology.json) | LLDP/CDP neighbors, bonds, bridge ports, SR-IOV VFs, IP addresses, multicast, ARP/ND and FDB counts |
+| [Host network stack](grafana/dashboards/ethtool-host-stack.json) | Softnet per CPU, TCP/UDP/IP counters, conntrack, qdisc, nftables counters, RDMA/InfiniBand |
+
+### Demo stack
+
+On a Linux host, [`compose/docker-compose.yml`](compose/docker-compose.yml) runs the exporter, Prometheus, and Grafana (all on `127.0.0.1`) with the shipped configs and dashboards:
+
+```bash
+cd compose && docker compose up -d --build   # Grafana on http://127.0.0.1:3000
+```
+
 ## Flags
 
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `--web.listen-address` | `127.0.0.1:9417` | Listen address (loopback by default) |
+| `--web.telemetry-path` | `/metrics` | Metrics path |
 | `--web.config.file` | _(empty)_ | TLS / basic-auth ([Prometheus web config](https://prometheus.io/docs/guides/tls-encryption/)) |
 | `--web.disable-landing-page` | `false` | Serve `/metrics` only |
+| `--web.max-requests-in-flight` | `1` | Concurrent scrapes (0 = unlimited) |
 | `--path.sysfs` | `/sys` | sysfs root |
 | `--path.procfs` | `/proc` | procfs root |
-| `--collector.device-include` | _(empty)_ | Interface include regexp |
-| `--collector.device-exclude` | `^(lo\|docker.*\|…)$` | Interface exclude regexp |
+| `--collector.device-include` | _(empty)_ | Interface include regexp (exclusive with exclude) |
+| `--collector.device-exclude` | `^(lo\|docker.*\|veth.*\|br-.*\|virbr.*)$` | Interface exclude regexp |
 | `--collector.ethtool.metrics-include` | `.*` | Filter driver stat names |
 | `--collector.neighbor` | `true` | Enable LLDP/CDP capture (no-op if `-tags noneighbor`) |
 | `--collector.neighbor.redact` | `false` | Omit free-text / management identity labels |
@@ -84,10 +142,17 @@ See [docs/INSTALL.md](docs/INSTALL.md) for containers, Alloy, and hardening deta
 | `--collector.neighbor.probe-window` | `35s` | Probe listen window (exceeds typical LLDP 30s interval) |
 | `--collector.neighbor.probe-min` | `1m` | Min backoff between quiet-interface probes |
 | `--collector.neighbor.probe-max` | `15m` | Max backoff when no LLDP/CDP is seen |
+| `--collector.neighbor.max-continuous` | `16` | Max simultaneous continuous AF_PACKET listeners |
 | `--collector.workers` | `4` | Parallel per-device scrape workers |
 | `--collector.optics.cache` | `60s` | Cache module DOM / EEPROM reads |
+| `--collector.nftables.cache` | `15s` | Cache nftables dumps across scrapes |
 | `--collector.neg-cache` | `5m` | Cache unsupported probe failures |
-| `--collector.optics` / `--collector.std-stats` / … | `true` | Per-subsystem toggles (see `--help`) |
+| `--collector.l3-neigh.max` | `4096` | Max ARP/ND series per scrape (-1 unlimited) |
+| `--collector.fdb.max` | `8192` | Max FDB series per scrape (-1 unlimited) |
+| `--log.level` | `info` | `debug`, `info`, `warn`, `error` |
+| `--version` | | Print version and exit |
+
+Per-subsystem toggles, all default `true`: `--collector.optics`, `.std-stats`, `.link-modes`, `.features`, `.priv-flags`, `.rss`, `.pause-fec-stats`, `.addresses`, `.l3-neigh`, `.fdb`, `.qdisc`, `.nftables`, `.rdma`, `.conntrack`, `.multicast`, `.softnet`, `.stack`.
 
 ## Resource usage (observed)
 
@@ -156,6 +221,11 @@ Lean profile:
 - `ethtool_conntrack_*`, `ethtool_nftables_*`
 - `ethtool_igmp_group_info`, `ethtool_mld_group_info`, `ethtool_device_mcast_info`
 
+### Exporter
+- `ethtool_scrape_success`, `ethtool_scrape_duration_seconds`, `ethtool_scrape_stage_duration_seconds`
+- `ethtool_exporter_build_info{version, goversion}`
+- Standard `go_*` and `process_*` metrics
+
 Unsupported features are omitted per interface (not scraped as zeros).
 
 ## Platform notes
@@ -170,15 +240,20 @@ cmd/ethtool_exporter/   # main binary
 internal/               # collector, ethtool, neighbor, netlink, netfilter
 vendor/                 # Go module dependencies (committed)
 systemd/                # unit file, drop-in, web-config example
-alloy/                  # Grafana Alloy scrape example
+prometheus/             # scrape config, file-SD targets, recording + alerting rules, rule tests
+alloy/                  # Grafana Alloy: per-host agent and central fleet configs
+grafana/                # dashboards (JSON) and provisioning
+compose/                # single-host demo stack (exporter + Prometheus + Grafana)
 docs/                   # install / design notes
 ```
+
+`make check-assets` validates the Prometheus, Alloy, and Grafana files (needs `promtool`, `alloy`, and `jq`); CI runs it on every push.
 
 ## Documentation
 
 | Doc | Topic |
 |-----|--------|
-| [docs/INSTALL.md](docs/INSTALL.md) | Install, containers, Alloy |
+| [docs/INSTALL.md](docs/INSTALL.md) | Install, containers, Prometheus, Alloy, Grafana |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |

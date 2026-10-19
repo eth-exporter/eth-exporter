@@ -1,0 +1,65 @@
+# Example Prometheus configuration for ethtool_exporter.
+#
+#   promtool check config prometheus/prometheus.yml
+#   prometheus --config.file=prometheus/prometheus.yml
+#
+# The exporter listens on 127.0.0.1:9417 by default, so the simplest setup is a
+# Prometheus (or Alloy) agent on the same host. To scrape remote hosts, start the
+# exporter on a management address with --web.config.file (TLS + basic auth) and
+# use the file_sd / TLS sections below.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - rules/ethtool.rules.yml
+  - rules/ethtool.alerts.yml
+
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["127.0.0.1:9093"]
+
+scrape_configs:
+  - job_name: ethtool
+    # A full scrape (optics, neighbors, nftables, FDB) usually takes 0.3-1.5 s.
+    # Keep the timeout well above ethtool_scrape_duration_seconds.
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+    static_configs:
+      # Exporter on this host (default loopback listen address).
+      - targets: ["127.0.0.1:9417"]
+
+    # Additional hosts. Copy targets/ethtool.yml.example to targets/ethtool.yml
+    # and edit; Prometheus reloads the file automatically.
+    file_sd_configs:
+      - files: ["targets/*.yml"]
+        refresh_interval: 1m
+
+    relabel_configs:
+      # Show "host1" instead of "host1:9417" in dashboards and alerts.
+      - source_labels: [__address__]
+        regex: "(.+):9417"
+        target_label: instance
+        replacement: "$1"
+
+    # Remote targets protected by --web.config.file (see systemd/web-config.example.yml):
+    # scheme: https
+    # tls_config:
+    #   ca_file: /etc/prometheus/ethtool-ca.crt
+    #   # server_name: host1.example.com
+    # basic_auth:
+    #   username: scrape
+    #   password_file: /etc/prometheus/ethtool-scrape.password
+
+    # Optional: drop high-cardinality families you do not chart or alert on.
+    # (To trim `ethtool -S` driver counters, prefer the exporter flag
+    # --collector.ethtool.metrics-include, which filters before exposition.)
+    # metric_relabel_configs:
+    #   - source_labels: [__name__]
+    #     regex: "ethtool_(fdb_info|l3_neighbor_info|linkmode_info|feature_info|device_mcast_info)"
+    #     action: drop

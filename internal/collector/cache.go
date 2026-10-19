@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scottmo/eth-exporter/internal/ethtool"
+	"github.com/eth-exporter/eth-exporter/internal/ethtool"
 )
 
 // ttlCache caches expensive per-device results and unsupported probes.

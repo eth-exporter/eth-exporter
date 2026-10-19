@@ -1,0 +1,73 @@
+// Grafana Alloy: central scraper for many ethtool_exporter hosts.
+//
+//   alloy validate alloy/fleet.alloy
+//   alloy run alloy/fleet.alloy
+//
+// Use this file instead of config.alloy (not alongside it in the same
+// directory: both declare prometheus.remote_write "default").
+//
+// Each host must listen on a reachable address with TLS and basic auth, e.g.
+//   ethtool_exporter --web.listen-address=10.0.0.11:9417 \
+//     --web.config.file=/etc/ethtool_exporter/web-config.yml
+// See systemd/web-config.example.yml.
+
+// Targets file uses the Prometheus file_sd format; see
+// prometheus/targets/ethtool.yml.example.
+discovery.file "ethtool" {
+	files            = ["/etc/alloy/targets/ethtool*.yml"]
+	refresh_interval = "1m"
+}
+
+discovery.relabel "ethtool" {
+	targets = discovery.file.ethtool.targets
+
+	// Show "host1" instead of "host1:9417" in dashboards and alerts.
+	rule {
+		source_labels = ["__address__"]
+		regex         = "(.+):9417"
+		target_label  = "instance"
+		replacement   = "$1"
+	}
+}
+
+prometheus.scrape "ethtool" {
+	job_name        = "ethtool"
+	targets         = discovery.relabel.ethtool.output
+	scheme          = "https"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	tls_config {
+		ca_file = "/etc/alloy/ethtool-ca.crt"
+	}
+
+	basic_auth {
+		username      = "scrape"
+		password_file = "/etc/alloy/ethtool-scrape.password"
+	}
+
+	forward_to = [prometheus.relabel.ethtool.receiver]
+}
+
+// Drop optional high-cardinality families before remote_write. Remove rules
+// for any family you chart (the Topology dashboard uses ARP/ND and FDB counts).
+prometheus.relabel "ethtool" {
+	rule {
+		source_labels = ["__name__"]
+		regex         = "ethtool_(fdb_info|device_mcast_info|linkmode_info)"
+		action        = "drop"
+	}
+
+	forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+	endpoint {
+		url = "https://mimir.example.com/api/v1/push"
+
+		basic_auth {
+			username = sys.env("REMOTE_WRITE_USERNAME")
+			password = sys.env("REMOTE_WRITE_PASSWORD")
+		}
+	}
+}

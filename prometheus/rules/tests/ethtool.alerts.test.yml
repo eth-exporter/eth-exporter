@@ -1,0 +1,146 @@
+# Unit tests for ethtool.alerts.yml and ethtool.rules.yml.
+#   promtool test rules prometheus/rules/tests/ethtool.alerts.test.yml
+
+rule_files:
+  - ../ethtool.alerts.yml
+  - ../ethtool.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: exporter and interface state
+    interval: 1m
+    input_series:
+      - series: 'up{job="ethtool", instance="host1"}'
+        values: "1 1 0x10"
+      # eth0 was up, then goes down -> alert.
+      - series: 'ethtool_interface_up{job="ethtool", instance="host1", device="eth0"}'
+        values: "1x4 0x10"
+      # eth9 was never up (unused port) -> no alert.
+      - series: 'ethtool_interface_up{job="ethtool", instance="host1", device="eth9"}'
+        values: "0x14"
+      - series: 'ethtool_interface_carrier_changes_total{job="ethtool", instance="host1", device="eth0", direction="total"}'
+        values: "0 2 4 6 8 10 10x10"
+      - series: 'ethtool_bond_mii_up{job="ethtool", instance="host1", device="bond0"}'
+        values: "1 1 0x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: EthtoolExporterDown
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1 }
+            exp_annotations:
+              summary: "ethtool_exporter on host1 is unreachable"
+              description: "Prometheus has failed to scrape host1 (job ethtool) for 5 minutes. Interface metrics and alerts for this host are blind."
+      - eval_time: 10m
+        alertname: EthtoolInterfaceDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: ethtool, instance: host1, device: eth0 }
+            exp_annotations:
+              summary: "host1 eth0 is down"
+              description: "Interface eth0 on host1 was up within the last 24 hours and is now operationally down."
+      - eval_time: 5m
+        alertname: EthtoolInterfaceFlapping
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1, device: eth0, direction: total }
+            exp_annotations:
+              summary: "host1 eth0 carrier is flapping"
+              description: "10 carrier changes in the last 15 minutes. Check cabling, optics, and the peer port."
+      - eval_time: 10m
+        alertname: EthtoolBondMemberDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: ethtool, instance: host1, device: bond0 }
+            exp_annotations:
+              summary: "host1 bond device bond0 MII status is down"
+              description: "A bonding master or slave reports mii_status down; redundancy is reduced or lost."
+
+  - name: errors, utilization, optics
+    interval: 1m
+    input_series:
+      # 10 Gb/s link.
+      - series: 'ethtool_interface_speed_mbps{job="ethtool", instance="host1", device="eth0"}'
+        values: "10000x30"
+      - series: 'ethtool_interface_up{job="ethtool", instance="host1", device="eth0"}'
+        values: "1x30"
+      # 1000 pps with 10 errors/s (1%) on eth0.
+      - series: 'ethtool_interface_stat{job="ethtool", instance="host1", device="eth0", stat="rx_packets"}'
+        values: "0+60000x30"
+      - series: 'ethtool_interface_stat{job="ethtool", instance="host1", device="eth0", stat="rx_errors"}'
+        values: "0+600x30"
+      # 1.2 GB/s = 9.6 Gb/s receive (96% utilization).
+      - series: 'ethtool_interface_stat{job="ethtool", instance="host1", device="eth0", stat="rx_bytes"}'
+        values: "0+72000000000x30"
+      - series: 'ethtool_interface_stat{job="ethtool", instance="host1", device="eth0", stat="tx_bytes"}'
+        values: "0+60000x30"
+      - series: 'ethtool_module_rx_power_dbm{job="ethtool", instance="host1", device="eth0"}'
+        values: "-16x30"
+      # Dark port with a module but no fiber: interface down -> no RX power alert.
+      - series: 'ethtool_module_rx_power_dbm{job="ethtool", instance="host1", device="eth1"}'
+        values: "-40x30"
+      - series: 'ethtool_interface_up{job="ethtool", instance="host1", device="eth1"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: EthtoolInterfaceErrors
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1, device: eth0 }
+            exp_annotations:
+              summary: "host1 eth0 error ratio is 1%"
+              description: "More than 0.1% of packets on eth0 are errored. Check FEC, optics DOM, and CRC counters on the Physical layer dashboard."
+      - eval_time: 25m
+        alertname: EthtoolInterfaceHighUtilization
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1, device: eth0 }
+            exp_annotations:
+              summary: "host1 eth0 is at 96% of link speed"
+              description: "Receive or transmit throughput has exceeded 90% of the negotiated speed for 15 minutes."
+      - eval_time: 25m
+        alertname: EthtoolOpticRxPowerLow
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1, device: eth0 }
+            exp_annotations:
+              summary: "host1 eth0 optical RX power is low (-16 dBm)"
+              description: "Received optical power is below -14 dBm. Clean connectors, check the patch path, or compare with the peer TX power. Adjust the threshold for your module type."
+    promql_expr_test:
+      - expr: instance_device:ethtool_interface_receive_utilization:ratio5m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'instance_device:ethtool_interface_receive_utilization:ratio5m{job="ethtool", instance="host1", device="eth0"}'
+            value: 0.96
+
+  - name: host stack
+    interval: 1m
+    input_series:
+      - series: 'ethtool_conntrack_entries{job="ethtool", instance="host1"}'
+        values: "900x20"
+      - series: 'ethtool_conntrack_max{job="ethtool", instance="host1"}'
+        values: "1000x20"
+      - series: 'ethtool_softnet_stat{job="ethtool", instance="host1", cpu="0", stat="dropped"}'
+        values: "0+60x20"
+      - series: 'ethtool_softnet_stat{job="ethtool", instance="host1", cpu="1", stat="dropped"}'
+        values: "0x20"
+      - series: 'ethtool_stack_stat{job="ethtool", instance="host1", protocol="Tcp", stat="OutSegs"}'
+        values: "0+60000x20"
+      - series: 'ethtool_stack_stat{job="ethtool", instance="host1", protocol="Tcp", stat="RetransSegs"}'
+        values: "0+6000x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: EthtoolConntrackTableNearlyFull
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1 }
+            exp_annotations:
+              summary: "host1 conntrack table is 90% full"
+              description: "When nf_conntrack is full, new connections are dropped. Raise net.netfilter.nf_conntrack_max or reduce tracked flows."
+      - eval_time: 15m
+        alertname: EthtoolSoftnetDrops
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1 }
+            exp_annotations:
+              summary: "host1 is dropping packets in the softnet backlog"
+              description: "1 packets/s dropped because the per-CPU input queue was full. Consider raising net.core.netdev_max_backlog or spreading load with RSS/RPS."
+      - eval_time: 18m
+        alertname: EthtoolTCPRetransmitsHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, job: ethtool, instance: host1, protocol: Tcp }
+            exp_annotations:
+              summary: "host1 TCP retransmit ratio is 10%"
+              description: "More than 5% of TCP segments sent are retransmissions, indicating loss or congestion on the path."

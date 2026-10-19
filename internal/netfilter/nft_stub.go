@@ -6,7 +6,7 @@ import "fmt"
 
 type Client struct{}
 
-func New() (*Client, error) { return nil, fmt.Errorf("nftables netlink only on Linux") }
+func New() (*Client, error)    { return nil, fmt.Errorf("nftables netlink only on Linux") }
 func (c *Client) Close() error { return nil }
 
 func (c *Client) Dump() (Snapshot, error) { return Snapshot{}, fmt.Errorf("unsupported") }

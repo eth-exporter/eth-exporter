@@ -1,0 +1,14 @@
+# Grafana dashboard provisioning for eth-exporter.
+# Copy to /etc/grafana/provisioning/dashboards/ and place the JSON files from
+# grafana/dashboards/ in the path below.
+apiVersion: 1
+
+providers:
+  - name: eth-exporter
+    folder: eth-exporter
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana/dashboards/eth-exporter

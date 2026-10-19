@@ -1,0 +1,181 @@
+# Alerting rules for ethtool_exporter.
+#
+#   promtool check rules prometheus/rules/ethtool.alerts.yml
+#   promtool test rules prometheus/rules/tests/*.yml
+#
+# Thresholds are reasonable starting points, not universal truths. Optical
+# power and temperature limits in particular depend on the module type; check
+# the transceiver datasheet and adjust per site.
+#
+# The rules only assume the default `job="ethtool"` in EthtoolExporterDown;
+# rename it if your scrape job differs.
+
+groups:
+  - name: ethtool-exporter
+    rules:
+      - alert: EthtoolExporterDown
+        expr: up{job="ethtool"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ethtool_exporter on {{ $labels.instance }} is unreachable"
+          description: "Prometheus has failed to scrape {{ $labels.instance }} (job {{ $labels.job }}) for 5 minutes. Interface metrics and alerts for this host are blind."
+
+      - alert: EthtoolExporterScrapeFailing
+        expr: ethtool_scrape_success == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ethtool_exporter on {{ $labels.instance }} cannot enumerate interfaces"
+          description: "ethtool_scrape_success has been 0 for 10 minutes. The exporter could not read /sys/class/net; check --path.sysfs and container mounts."
+
+      - alert: EthtoolExporterScrapeSlow
+        expr: ethtool_scrape_duration_seconds > 8
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ethtool_exporter on {{ $labels.instance }} scrapes are slow ({{ $value | humanizeDuration }})"
+          description: "Scrapes are approaching the typical 10s scrape_timeout. Inspect ethtool_scrape_stage_duration_seconds and disable expensive collectors (see the README lean profile) or raise scrape_timeout."
+
+  - name: ethtool-interfaces
+    rules:
+      # Fires only for interfaces that were operationally up at some point in
+      # the last 24h, so permanently unused ports do not alert.
+      - alert: EthtoolInterfaceDown
+        expr: |
+          ethtool_interface_up == 0
+            and on (job, instance, device)
+          max_over_time(ethtool_interface_up[1d]) == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} is down"
+          description: "Interface {{ $labels.device }} on {{ $labels.instance }} was up within the last 24 hours and is now operationally down."
+
+      - alert: EthtoolInterfaceFlapping
+        expr: increase(ethtool_interface_carrier_changes_total{direction="total"}[15m]) > 4
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} carrier is flapping"
+          description: "{{ $value | humanize }} carrier changes in the last 15 minutes. Check cabling, optics, and the peer port."
+
+      - alert: EthtoolInterfaceErrors
+        expr: |
+          (
+            sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_errors|tx_errors"}[5m]))
+              / sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_packets|tx_packets"}[5m]))
+          ) > 0.001
+            and
+          sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_errors|tx_errors"}[5m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} error ratio is {{ $value | humanizePercentage }}"
+          description: "More than 0.1% of packets on {{ $labels.device }} are errored. Check FEC, optics DOM, and CRC counters on the Physical layer dashboard."
+
+      - alert: EthtoolInterfaceRxOverruns
+        expr: |
+          sum without (stat) (
+            rate(ethtool_interface_stat{stat=~"rx_missed_errors|rx_fifo_errors|rx_over_errors"}[5m])
+          ) > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} is dropping packets in the NIC ({{ $value | humanize }}/s)"
+          description: "RX ring or FIFO overflows. Consider larger RX rings (ethtool -G), more queues, or IRQ/RPS tuning."
+
+      - alert: EthtoolInterfaceHighUtilization
+        expr: |
+          max without (stat) (rate(ethtool_interface_stat{stat=~"rx_bytes|tx_bytes"}[5m])) * 8
+            / (ethtool_interface_speed_mbps * 1e6 > 0)
+          > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} is at {{ $value | humanizePercentage }} of link speed"
+          description: "Receive or transmit throughput has exceeded 90% of the negotiated speed for 15 minutes."
+
+      - alert: EthtoolBondMemberDown
+        expr: ethtool_bond_mii_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} bond device {{ $labels.device }} MII status is down"
+          description: "A bonding master or slave reports mii_status down; redundancy is reduced or lost."
+
+  - name: ethtool-physical
+    rules:
+      - alert: EthtoolFECUncorrectableErrors
+        expr: rate(ethtool_fec_blocks_total{stat="uncorrectable_blocks"}[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} has uncorrectable FEC errors"
+          description: "{{ $value | humanize }} uncorrectable FEC blocks/s. Frames are being corrupted on the wire; check optics, fiber, and the peer."
+
+      # Only links that are up: unused cages with a module but no fiber read ~-40 dBm.
+      - alert: EthtoolOpticRxPowerLow
+        expr: |
+          ethtool_module_rx_power_dbm < -14
+            and on (job, instance, device)
+          ethtool_interface_up == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} optical RX power is low ({{ $value | humanize }} dBm)"
+          description: "Received optical power is below -14 dBm. Clean connectors, check the patch path, or compare with the peer TX power. Adjust the threshold for your module type."
+
+      - alert: EthtoolOpticTemperatureHigh
+        expr: ethtool_module_temperature_celsius > 70
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} {{ $labels.device }} transceiver is hot ({{ $value | humanize }} °C)"
+          description: "Module temperature has been above 70 °C (commercial-grade limit) for 15 minutes. Check chassis airflow."
+
+  - name: ethtool-host
+    rules:
+      - alert: EthtoolConntrackTableNearlyFull
+        expr: ethtool_conntrack_entries / ethtool_conntrack_max > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} conntrack table is {{ $value | humanizePercentage }} full"
+          description: "When nf_conntrack is full, new connections are dropped. Raise net.netfilter.nf_conntrack_max or reduce tracked flows."
+
+      - alert: EthtoolSoftnetDrops
+        expr: sum without (cpu, stat) (rate(ethtool_softnet_stat{stat="dropped"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} is dropping packets in the softnet backlog"
+          description: "{{ $value | humanize }} packets/s dropped because the per-CPU input queue was full. Consider raising net.core.netdev_max_backlog or spreading load with RSS/RPS."
+
+      - alert: EthtoolTCPRetransmitsHigh
+        expr: |
+          (
+            sum without (stat) (rate(ethtool_stack_stat{protocol="Tcp", stat="RetransSegs"}[5m]))
+              / sum without (stat) (rate(ethtool_stack_stat{protocol="Tcp", stat="OutSegs"}[5m]))
+          ) > 0.05
+            and
+          sum without (stat) (rate(ethtool_stack_stat{protocol="Tcp", stat="OutSegs"}[5m])) > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} TCP retransmit ratio is {{ $value | humanizePercentage }}"
+          description: "More than 5% of TCP segments sent are retransmissions, indicating loss or congestion on the path."

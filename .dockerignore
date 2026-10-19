@@ -1,0 +1,7 @@
+.git
+.github
+dist
+/ethtool_exporter
+/ethtool_exporter-*
+*.test
+*.out

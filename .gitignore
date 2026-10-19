@@ -1,6 +1,7 @@
-# Binaries
+# Binaries / release archives
 /ethtool_exporter
 /ethtool_exporter-*
+/dist/
 *.exe
 *.test
 *.out

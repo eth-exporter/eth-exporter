@@ -17,5 +17,15 @@ once tagged releases begin.
 - systemd unit, Alloy example, web-config example
 - Vendored Go module dependencies under `vendor/`
 - Project docs: README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, MIT-0 LICENSE
+- `--version` flag and `ethtool_exporter_build_info` metric
+- Prometheus example config with file SD, recording rules, alerting rules, and `promtool` rule tests
+- Alloy fleet config (`alloy/fleet.alloy`) for a central scraper over TLS/basic auth
+- Grafana dashboards: Overview, Physical layer & optics, Topology, Host network stack; provisioning files
+- Dockerfile and single-host compose demo stack
+- CI (Go tests, vet, gofmt, vendor check, monitoring asset validation, Docker build) and tag-driven release workflow (`make dist`)
 
-[Unreleased]: https://github.com/scottmo/eth-exporter/compare/HEAD...HEAD
+### Changed
+
+- `alloy/config.alloy` uses `constants.hostname` for `instance` and sets `job_name = "ethtool"`
+
+[Unreleased]: https://github.com/eth-exporter/eth-exporter/commits/main

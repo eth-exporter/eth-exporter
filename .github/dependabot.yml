@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    # Keep vendor/ in sync so the tree stays buildable offline.
+    vendor: true
+    groups:
+      go-deps:
+        patterns: ["*"]

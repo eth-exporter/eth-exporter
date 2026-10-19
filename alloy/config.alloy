@@ -1,31 +1,48 @@
-// Grafana Alloy scrape example for ethtool_exporter.
-// Assumes the exporter listens on localhost:9417.
+// Grafana Alloy: scrape the ethtool_exporter on this host and remote_write it.
+//
+//   alloy validate alloy/config.alloy
+//   alloy run alloy/config.alloy
+//
+// This is the recommended layout: Alloy and the exporter run on the same host,
+// so the exporter can keep its default loopback-only listen address.
+// For a central Alloy that scrapes many hosts, see fleet.alloy.
 
 prometheus.scrape "ethtool" {
-	targets = [{
+	job_name = "ethtool"
+	targets  = [{
 		__address__ = "127.0.0.1:9417",
-		job         = "ethtool",
-		instance    = env("HOSTNAME"),
+		// Label series with the hostname instead of 127.0.0.1:9417.
+		instance = constants.hostname,
 	}]
-	forward_to      = [prometheus.remote_write.default.receiver]
+	metrics_path    = "/metrics"
 	scrape_interval = "15s"
 	scrape_timeout  = "10s"
-	metrics_path    = "/metrics"
+	forward_to      = [prometheus.relabel.ethtool.receiver]
 }
 
-// Optional: discover many hosts via file SD instead of a fixed target.
-// prometheus.scrape "ethtool_fleet" {
-//   targets    = discovery.file.ethtool.targets
-//   forward_to = [prometheus.remote_write.default.receiver]
-//   scrape_interval = "30s"
-// }
-//
-// discovery.file "ethtool" {
-//   files = ["/etc/alloy/ethtool_targets.json"]
-// }
+// Optional filtering before samples leave the host. The bundled Topology
+// dashboard charts ARP/ND and FDB counts; drop them only if you do not need it.
+prometheus.relabel "ethtool" {
+	// rule {
+	// 	source_labels = ["__name__"]
+	// 	regex         = "ethtool_(fdb_info|l3_neighbor_info|device_mcast_info)"
+	// 	action        = "drop"
+	// }
+
+	forward_to = [prometheus.remote_write.default.receiver]
+}
 
 prometheus.remote_write "default" {
 	endpoint {
+		// Prometheus (started with --web.enable-remote-write-receiver):
+		//   http://prometheus.example.com:9090/api/v1/write
+		// Mimir:            https://mimir.example.com/api/v1/push
+		// Grafana Cloud:    see your stack's "Prometheus" details page.
 		url = "https://prometheus.example.com/api/v1/write"
+
+		// basic_auth {
+		// 	username = sys.env("REMOTE_WRITE_USERNAME")
+		// 	password = sys.env("REMOTE_WRITE_PASSWORD")
+		// }
 	}
 }

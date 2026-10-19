@@ -1,6 +1,6 @@
 [Unit]
 Description=ethtool Prometheus exporter
-Documentation=https://github.com/scottmo/eth-exporter#readme
+Documentation=https://github.com/eth-exporter/eth-exporter#readme
 After=network-online.target
 Wants=network-online.target
 

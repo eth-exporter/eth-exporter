@@ -1,0 +1,52 @@
+# Recording rules for ethtool_exporter.
+#
+#   promtool check rules prometheus/rules/ethtool.rules.yml
+#
+# Pre-computed rates are cheaper to chart across a large fleet and give alerts a
+# stable input. The shipped dashboards query raw series and do not require these.
+
+groups:
+  - name: ethtool.rules
+    rules:
+      # Interface throughput (bits/s) from sysfs statistics.
+      - record: instance_device:ethtool_interface_receive_bits:rate5m
+        expr: sum without (stat) (rate(ethtool_interface_stat{stat="rx_bytes"}[5m])) * 8
+      - record: instance_device:ethtool_interface_transmit_bits:rate5m
+        expr: sum without (stat) (rate(ethtool_interface_stat{stat="tx_bytes"}[5m])) * 8
+
+      # Utilization against negotiated speed (0-1). Interfaces with unknown
+      # speed (-1, e.g. most virtual devices) are omitted.
+      - record: instance_device:ethtool_interface_receive_utilization:ratio5m
+        expr: |
+          instance_device:ethtool_interface_receive_bits:rate5m
+            / (ethtool_interface_speed_mbps * 1e6 > 0)
+      - record: instance_device:ethtool_interface_transmit_utilization:ratio5m
+        expr: |
+          instance_device:ethtool_interface_transmit_bits:rate5m
+            / (ethtool_interface_speed_mbps * 1e6 > 0)
+
+      # Packets, errors, and drops per second (rx + tx).
+      - record: instance_device:ethtool_interface_packets:rate5m
+        expr: sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_packets|tx_packets"}[5m]))
+      - record: instance_device:ethtool_interface_errors:rate5m
+        expr: sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_errors|tx_errors"}[5m]))
+      - record: instance_device:ethtool_interface_drops:rate5m
+        expr: sum without (stat) (rate(ethtool_interface_stat{stat=~"rx_dropped|tx_dropped"}[5m]))
+
+      # FEC block counters (genetlink).
+      - record: instance_device:ethtool_fec_corrected_blocks:rate5m
+        expr: sum without (stat) (rate(ethtool_fec_blocks_total{stat="corrected_blocks"}[5m]))
+      - record: instance_device:ethtool_fec_uncorrectable_blocks:rate5m
+        expr: sum without (stat) (rate(ethtool_fec_blocks_total{stat="uncorrectable_blocks"}[5m]))
+
+      # Host stack.
+      - record: instance:ethtool_softnet_dropped:rate5m
+        expr: sum without (cpu, stat) (rate(ethtool_softnet_stat{stat="dropped"}[5m]))
+      - record: instance:ethtool_softnet_time_squeeze:rate5m
+        expr: sum without (cpu, stat) (rate(ethtool_softnet_stat{stat="time_squeeze"}[5m]))
+      - record: instance:ethtool_conntrack_utilization:ratio
+        expr: ethtool_conntrack_entries / ethtool_conntrack_max
+      - record: instance:ethtool_tcp_retransmit:ratio5m
+        expr: |
+          sum without (stat) (rate(ethtool_stack_stat{protocol="Tcp", stat="RetransSegs"}[5m]))
+            / sum without (stat) (rate(ethtool_stack_stat{protocol="Tcp", stat="OutSegs"}[5m]))

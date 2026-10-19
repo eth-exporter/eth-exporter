@@ -1,4 +1,4 @@
-module github.com/scottmo/eth-exporter
+module github.com/eth-exporter/eth-exporter
 
 go 1.22
 

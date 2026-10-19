@@ -1,0 +1,15 @@
+# Grafana datasource provisioning for the eth-exporter dashboards.
+# Copy to /etc/grafana/provisioning/datasources/ and set url to your Prometheus
+# (or Mimir / Thanos query endpoint).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090
+    isDefault: true
+    jsonData:
+      # Match your scrape_interval so $__rate_interval covers at least 4 samples.
+      timeInterval: 15s

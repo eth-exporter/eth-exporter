@@ -20,7 +20,7 @@ Prefer one of:
 Include as much of the following as you can:
 
 - Description of the issue and impact
-- Affected commit or release tag
+- Affected commit or release tag (`ethtool_exporter --version`)
 - Proof of concept or reproduction steps (non-destructive preferred)
 - Whether the issue is already public elsewhere
 - Your preferred credit name (or anonymous)
@@ -35,6 +35,7 @@ In scope examples:
 - Authentication / TLS bypass when `--web.config.file` is configured
 - Unexpected packet injection or kernel write paths (the exporter should be read-only)
 - Sensitive data disclosure beyond intended metrics (e.g. unbounded dumps, secrets in logs)
+- Shipped deployment assets (systemd unit, Dockerfile, compose stack, Alloy/Prometheus/Grafana examples) that weaken a deployment when used as documented
 
 Out of scope examples:
 

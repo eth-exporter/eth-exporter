@@ -5,9 +5,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/scottmo/eth-exporter/internal/ethtool"
-	"github.com/scottmo/eth-exporter/internal/netfilter"
-	rtn "github.com/scottmo/eth-exporter/internal/netlink"
+	"github.com/eth-exporter/eth-exporter/internal/ethtool"
+	"github.com/eth-exporter/eth-exporter/internal/netfilter"
+	rtn "github.com/eth-exporter/eth-exporter/internal/netlink"
 )
 
 // ExtraDescs holds optional comprehensive metrics.

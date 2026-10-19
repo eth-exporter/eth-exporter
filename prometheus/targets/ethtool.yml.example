@@ -1,0 +1,18 @@
+# File-based service discovery targets for the "ethtool" job.
+#   cp ethtool.yml.example ethtool.yml
+#
+# Extra labels are attached to every series from those targets and can be used
+# to filter dashboards (e.g. by site or role).
+
+- targets:
+    - host1.example.com:9417
+    - host2.example.com:9417
+  labels:
+    site: dc1
+    role: hypervisor
+
+- targets:
+    - storage1.example.com:9417
+  labels:
+    site: dc1
+    role: storage

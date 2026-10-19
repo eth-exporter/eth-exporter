@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,9 +25,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
 
-	"github.com/scottmo/eth-exporter/internal/collector"
-	"github.com/scottmo/eth-exporter/internal/neighbor"
+	"github.com/eth-exporter/eth-exporter/internal/collector"
+	"github.com/eth-exporter/eth-exporter/internal/neighbor"
 )
+
+// version is set at build time via -ldflags "-X main.version=...".
+var version = "dev"
 
 func main() {
 	var (
@@ -74,9 +78,15 @@ func main() {
 		enSoftnet   = flag.Bool("collector.softnet", true, "Collect softnet stats")
 		enStack     = flag.Bool("collector.stack", true, "Collect /proc/net/snmp+netstat")
 
-		logLevel = flag.String("log.level", "info", "Log level: debug, info, warn, error")
+		logLevel    = flag.String("log.level", "info", "Log level: debug, info, warn, error")
+		showVersion = flag.Bool("version", false, "Print version and exit")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("ethtool_exporter %s (%s %s/%s)\n", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		return
+	}
 
 	level := new(slog.LevelVar)
 	switch *logLevel {
@@ -174,6 +184,11 @@ func main() {
 		collectors.NewBuildInfoCollector(),
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name:        "ethtool_exporter_build_info",
+			Help:        "Exporter build metadata (value always 1).",
+			ConstLabels: prometheus.Labels{"version": version, "goversion": runtime.Version()},
+		}, func() float64 { return 1 }),
 	)
 
 	c, err := collector.New(collector.Options{
@@ -237,6 +252,7 @@ func main() {
 	}
 
 	logger.Info("starting ethtool exporter",
+		"version", version,
 		"listen", *listenAddr,
 		"path", *metricsPath,
 		"workers", *workers,

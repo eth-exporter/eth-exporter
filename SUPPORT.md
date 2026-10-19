@@ -2,7 +2,7 @@
 
 ## Getting help
 
-- **Bugs / unexpected metrics** — open a [GitHub issue](https://github.com/scottmo/eth-exporter/issues) with kernel version, driver, flags, and what you expected vs observed.
+- **Bugs / unexpected metrics** — open a [GitHub issue](https://github.com/eth-exporter/eth-exporter/issues) with kernel version, driver, flags, and what you expected vs observed.
 - **How do I…?** — check [README.md](README.md) and [docs/INSTALL.md](docs/INSTALL.md) first; then open a discussion or issue.
 - **Security** — follow [SECURITY.md](SECURITY.md); do not file public issues for vulnerabilities.
 - **Community standards** — [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

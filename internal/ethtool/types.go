@@ -25,27 +25,27 @@ type LinkSettings struct {
 
 // Coalesce mirrors ETHTOOL_GCOALESCE.
 type Coalesce struct {
-	RxUsecs          uint32
-	RxMaxFrames      uint32
-	TxUsecs          uint32
-	TxMaxFrames      uint32
-	RxUsecsIRQ       uint32
-	RxMaxFramesIRQ   uint32
-	TxUsecsIRQ       uint32
-	TxMaxFramesIRQ   uint32
-	StatsBlockUsecs  uint32
-	UseAdaptiveRX    bool
-	UseAdaptiveTX    bool
-	PktRateLow       uint32
-	RxUsecsLow       uint32
-	RxMaxFramesLow   uint32
-	TxUsecsLow       uint32
-	TxMaxFramesLow   uint32
-	PktRateHigh      uint32
-	RxUsecsHigh      uint32
-	RxMaxFramesHigh  uint32
-	TxUsecsHigh      uint32
-	TxMaxFramesHigh  uint32
+	RxUsecs            uint32
+	RxMaxFrames        uint32
+	TxUsecs            uint32
+	TxMaxFrames        uint32
+	RxUsecsIRQ         uint32
+	RxMaxFramesIRQ     uint32
+	TxUsecsIRQ         uint32
+	TxMaxFramesIRQ     uint32
+	StatsBlockUsecs    uint32
+	UseAdaptiveRX      bool
+	UseAdaptiveTX      bool
+	PktRateLow         uint32
+	RxUsecsLow         uint32
+	RxMaxFramesLow     uint32
+	TxUsecsLow         uint32
+	TxMaxFramesLow     uint32
+	PktRateHigh        uint32
+	RxUsecsHigh        uint32
+	RxMaxFramesHigh    uint32
+	TxUsecsHigh        uint32
+	TxMaxFramesHigh    uint32
 	RateSampleInterval uint32
 }
 
@@ -70,39 +70,39 @@ type PauseParam struct {
 
 // Channels mirrors ETHTOOL_GCHANNELS.
 type Channels struct {
-	MaxRX           uint32
-	MaxTX           uint32
-	MaxOther        uint32
-	MaxCombined     uint32
-	RXCount         uint32
-	TXCount         uint32
-	OtherCount      uint32
-	CombinedCount   uint32
+	MaxRX         uint32
+	MaxTX         uint32
+	MaxOther      uint32
+	MaxCombined   uint32
+	RXCount       uint32
+	TXCount       uint32
+	OtherCount    uint32
+	CombinedCount uint32
 }
 
 // EEE mirrors ETHTOOL_GEEE.
 type EEE struct {
-	Supported       uint32
-	Advertised      uint32
-	LPAdvertised    uint32
-	EEEActive       bool
-	EEEEnabled      bool
-	TxLpiEnabled    bool
-	TxLpiTimer      uint32
+	Supported    uint32
+	Advertised   uint32
+	LPAdvertised uint32
+	EEEActive    bool
+	EEEEnabled   bool
+	TxLpiEnabled bool
+	TxLpiTimer   uint32
 }
 
 // FEC mirrors ETHTOOL_GFECPARAM.
 type FEC struct {
-	Active    uint32
+	Active     uint32
 	Configured uint32
-	Supported uint32
+	Supported  uint32
 }
 
 // FeatureState describes one offload/feature bit.
 type FeatureState struct {
-	Available bool
-	Requested bool
-	Active    bool
+	Available    bool
+	Requested    bool
+	Active       bool
 	NeverChanged bool
 }
 

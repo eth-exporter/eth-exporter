@@ -22,7 +22,7 @@ Out of scope for this project:
 ## Development setup
 
 ```bash
-git clone https://github.com/scottmo/eth-exporter.git
+git clone https://github.com/eth-exporter/eth-exporter.git
 cd eth-exporter
 # Dependencies are vendored; offline builds work with -mod=vendor
 make test
@@ -64,6 +64,14 @@ make test
 - Keep the default listen address on loopback; any change to bind defaults needs strong justification.
 - Add or update unit tests for parsers and pure logic (`internal/neighbor`, `internal/ethtool`, etc.).
 
+### Monitoring assets
+
+Metric names and labels are a public interface used by [`prometheus/rules/`](prometheus/rules/), [`grafana/dashboards/`](grafana/dashboards/), and [`alloy/`](alloy/). When you add, rename, or relabel a metric:
+
+- Update affected rules, rule tests, and dashboard queries (dashboards can be edited in Grafana and re-exported; keep the `${datasource}` variable rather than a fixed data source UID).
+- Run `make check-assets` (requires `promtool`, `alloy`, and `jq`); CI runs the same checks.
+- Note renames in [CHANGELOG.md](CHANGELOG.md), since they break users' saved queries.
+
 ## Pull requests
 
 1. Fork and create a topic branch from `main`.
@@ -81,7 +89,7 @@ Maintainers may ask for smaller PRs if a change mixes unrelated refactors.
 Open a GitHub issue including:
 
 - Kernel version (`uname -r`) and NIC driver (`ethtool -i <iface>` or sysfs)
-- Exporter version / commit (`ethtool_exporter -version` if available, else `git describe`)
+- Exporter version / commit (`ethtool_exporter --version`)
 - Relevant flags
 - Unexpected metrics, logs, or resource use
 - Confirmation the host stayed healthy (no intentional data-plane changes)

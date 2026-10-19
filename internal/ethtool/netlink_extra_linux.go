@@ -7,30 +7,30 @@ import (
 )
 
 const (
-	ethMsgLinkModesGet     = 4
-	ethMsgLinkStateGet     = 6
-	ethMsgPrivFlagsGet     = 13
-	ethMsgModuleEEPROMGet  = 31
-	ethMsgRSSGet           = 38
+	ethMsgLinkModesGet    = 4
+	ethMsgLinkStateGet    = 6
+	ethMsgPrivFlagsGet    = 13
+	ethMsgModuleEEPROMGet = 31
+	ethMsgRSSGet          = 38
 
-	ethALinkModesHeader          = 1
-	ethALinkModesAutoneg         = 2
-	ethALinkModesOurs            = 3
-	ethALinkModesPeer            = 4
-	ethALinkModesSpeed           = 5
-	ethALinkModesDuplex          = 6
-	ethALinkModesMasterSlaveCfg  = 7
+	ethALinkModesHeader           = 1
+	ethALinkModesAutoneg          = 2
+	ethALinkModesOurs             = 3
+	ethALinkModesPeer             = 4
+	ethALinkModesSpeed            = 5
+	ethALinkModesDuplex           = 6
+	ethALinkModesMasterSlaveCfg   = 7
 	ethALinkModesMasterSlaveState = 8
-	ethALinkModesLanes           = 9
-	ethALinkModesRateMatching    = 10
+	ethALinkModesLanes            = 9
+	ethALinkModesRateMatching     = 10
 
-	ethALinkStateHeader     = 1
-	ethALinkStateLink       = 2
-	ethALinkStateSQI        = 3
-	ethALinkStateSQIMax     = 4
-	ethALinkStateExtState   = 5
+	ethALinkStateHeader      = 1
+	ethALinkStateLink        = 2
+	ethALinkStateSQI         = 3
+	ethALinkStateSQIMax      = 4
+	ethALinkStateExtState    = 5
 	ethALinkStateExtSubstate = 6
-	ethALinkStateExtDownCnt = 7
+	ethALinkStateExtDownCnt  = 7
 
 	ethAPrivFlagsHeader = 1
 	ethAPrivFlagsFlags  = 2

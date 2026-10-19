@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PROMETHEUS_VERSION: "3.15.0"
+  ALLOY_VERSION: "1.20.1"
+
+jobs:
+  go:
+    name: Go (${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.22", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go' | grep -v '^vendor/'))
+          if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - name: go vet
+        run: |
+          go vet -mod=vendor ./...
+          go vet -mod=vendor -tags noneighbor ./...
+      - name: Test
+        run: make test
+      - name: Cross-compile
+        run: make cross
+      - name: vendor/ is in sync with go.mod
+        if: matrix.go == '1.22'
+        run: |
+          go mod verify
+          go mod vendor
+          git diff --exit-code -- go.mod go.sum vendor/
+
+  monitoring-assets:
+    name: Prometheus / Alloy / Grafana assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install promtool and alloy
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          curl -fsSL -o "$RUNNER_TEMP/alloy.zip" "https://github.com/grafana/alloy/releases/download/v${ALLOY_VERSION}/alloy-linux-amd64.zip"
+          unzip -q -o "$RUNNER_TEMP/alloy.zip" -d "$RUNNER_TEMP"
+          install -m 755 "$RUNNER_TEMP/promtool" "$RUNNER_TEMP/bin/promtool"
+          install -m 755 "$RUNNER_TEMP/alloy-linux-amd64" "$RUNNER_TEMP/bin/alloy"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: make check-assets
+        run: make check-assets
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker build
+        run: |
+          docker build --build-arg VERSION=ci -t eth-exporter:ci .
+          docker run --rm eth-exporter:ci --version
+      - name: docker compose config
+        run: docker compose -f compose/docker-compose.yml config --quiet

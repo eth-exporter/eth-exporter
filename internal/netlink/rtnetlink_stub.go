@@ -6,7 +6,7 @@ import "fmt"
 
 type Client struct{}
 
-func New() (*Client, error) { return nil, fmt.Errorf("rtnetlink only on Linux") }
+func New() (*Client, error)    { return nil, fmt.Errorf("rtnetlink only on Linux") }
 func (c *Client) Close() error { return nil }
 
 func LinkIndex([]LinkInfo) map[int]string { return nil }
@@ -53,25 +53,25 @@ type FDBEntry struct {
 }
 
 type LinkInfo struct {
-	Index      int
-	Name       string
-	PermAddr   string
+	Index       int
+	Name        string
+	PermAddr    string
 	XDPAttached bool
-	XDPProgID  uint32
-	OperState  uint8
-	MTU        uint32
+	XDPProgID   uint32
+	OperState   uint8
+	MTU         uint32
 }
 
 type QdiscInfo struct {
-	IfIndex  int
-	IfName   string
-	Kind     string
-	Handle   uint32
-	Parent   uint32
-	Bytes    uint64
-	Packets  uint64
-	Drops    uint64
+	IfIndex    int
+	IfName     string
+	Kind       string
+	Handle     uint32
+	Parent     uint32
+	Bytes      uint64
+	Packets    uint64
+	Drops      uint64
 	Overlimits uint64
-	Qlen     uint32
-	Backlog  uint32
+	Qlen       uint32
+	Backlog    uint32
 }
