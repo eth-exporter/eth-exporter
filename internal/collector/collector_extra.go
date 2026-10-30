@@ -397,7 +397,7 @@ func (c *Collector) collectDeviceExtra(ch chan<- prometheus.Metric, name string)
 		})
 		if err == nil {
 			ch <- prometheus.MustNewConstMetric(c.extra.moduleInfoDOM, prometheus.GaugeValue, 1,
-				name, dom.Vendor, dom.PartNumber, dom.Serial, strconv.FormatUint(uint64(dom.Type), 10))
+				name, utf8Label(dom.Vendor), utf8Label(dom.PartNumber), utf8Label(dom.Serial), strconv.FormatUint(uint64(dom.Type), 10))
 			if dom.HasTemperature {
 				ch <- prometheus.MustNewConstMetric(c.extra.moduleTemp, prometheus.GaugeValue, dom.TemperatureC, name)
 			}

@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"encoding/hex"
 	"log/slog"
 	"regexp"
 	"runtime"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -429,8 +431,14 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.scrapeStage, prometheus.GaugeValue, time.Since(tHost).Seconds(), "host")
 
 	if c.neighbors != nil {
+		seen := map[string]bool{}
 		for _, n := range c.neighbors.List() {
 			chassis, port := truncate(n.ChassisID, 128), truncate(n.PortID, 128)
+			key := n.Interface + "\x00" + string(n.Protocol) + "\x00" + chassis + "\x00" + port
+			if seen[key] {
+				continue // duplicate after label normalisation; a dup would fail the whole scrape
+			}
+			seen[key] = true
 			sysName, sysDesc, portDesc := truncate(n.SystemName, 128), truncate(n.SystemDesc, 256), truncate(n.PortDesc, 128)
 			mgmt, platform, caps, vlan, srcMAC := truncate(n.ManagementAddr, 64), truncate(n.Platform, 64), truncate(n.Capabilities, 64), truncate(n.VLAN, 32), truncate(n.RawSourceMAC, 32)
 			if c.neighborRedact {
@@ -489,7 +497,7 @@ func (c *Collector) collectDevice(ch chan<- prometheus.Metric, name string) {
 	}
 	ch <- prometheus.MustNewConstMetric(c.ifaceInfo, prometheus.GaugeValue, 1,
 		info.Name, info.Address, info.Broadcast, info.OperState, info.Duplex, info.Flags,
-		info.IfAlias, info.PhysPortID, info.PhysPortName, info.PhysSwitchID, info.Group, info.NameAssign,
+		utf8Label(info.IfAlias), utf8Label(info.PhysPortID), utf8Label(info.PhysPortName), utf8Label(info.PhysSwitchID), utf8Label(info.Group), info.NameAssign,
 	)
 	up := 0.0
 	if info.OperState == "up" {
@@ -561,7 +569,7 @@ func (c *Collector) collectDevice(ch chan<- prometheus.Metric, name string) {
 
 	if drv, err := c.eth.DriverInfo(name); err == nil {
 		ch <- prometheus.MustNewConstMetric(c.drvInfo, prometheus.GaugeValue, 1,
-			name, drv.Driver, drv.Version, drv.FWVersion, drv.BusInfo, drv.EromVersion,
+			name, utf8Label(drv.Driver), utf8Label(drv.Version), utf8Label(drv.FWVersion), utf8Label(drv.BusInfo), utf8Label(drv.EromVersion),
 		)
 	}
 
@@ -687,16 +695,35 @@ func boolFloat(v bool) float64 {
 }
 
 func sanitizeLabel(s string) string {
-	s = strings.TrimSpace(s)
+	s = strings.TrimSpace(utf8Label(s))
 	s = strings.ReplaceAll(s, " ", "_")
 	return s
 }
 
+// utf8Label makes free-form hardware strings (SFP/QSFP EEPROM vendor/PN/SN,
+// LLDP TLVs, driver strings) safe as Prometheus label values. NUL/space
+// padding is trimmed; if what remains is printable valid UTF-8 it is returned
+// as-is, otherwise it is hex-encoded ("0x...") so distinct binary values (e.g.
+// LLDP port IDs with a non-text subtype) stay distinct. Without this,
+// client_golang's MustNewConstMetric panics and kills the whole exporter
+// (seen with AMD Pollara QSFP112 modules returning raw 0x80 bytes).
+func utf8Label(s string) string {
+	s = strings.Trim(s, "\x00 	\r\n")
+	if s == "" {
+		return s
+	}
+	if utf8.ValidString(s) && strings.IndexFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f }) < 0 {
+		return s
+	}
+	return "0x" + hex.EncodeToString([]byte(s))
+}
+
 func truncate(s string, n int) string {
+	s = utf8Label(s)
 	if len(s) <= n {
 		return s
 	}
-	return s[:n]
+	return strings.ToValidUTF8(s[:n], "")
 }
 
 // formatTCHandle renders a tc handle as major:minor (hex), matching `tc` output.

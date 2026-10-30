@@ -24,6 +24,11 @@ once tagged releases begin.
 - Dockerfile and single-host compose demo stack
 - CI (Go tests, vet, gofmt, vendor check, monitoring asset validation, Docker build) and tag-driven release workflow (`make dist`)
 
+### Fixed
+
+- Exporter no longer panics (`label value "..." is not valid UTF-8`) when a NIC, module EEPROM, or LLDP/CDP peer reports non-UTF-8 bytes (seen on AMD Pollara 400G QSFP112 modules). Free-form label values (module vendor/part/serial, driver info, interface alias/phys IDs, neighbor TLVs) are trimmed of NUL/space padding; values that are still not printable UTF-8 are emitted hex-encoded as `0x...` instead of crashing.
+- Duplicate LLDP/CDP neighbor entries (same device, protocol, chassis ID and port ID after label normalisation) are emitted once instead of failing the whole scrape with "collected before with the same name and label values".
+
 ### Changed
 
 - `alloy/config.alloy` uses `constants.hostname` for `instance` and sets `job_name = "ethtool"`
