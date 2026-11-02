@@ -28,4 +28,8 @@ once tagged releases begin.
 
 - `alloy/config.alloy` uses `constants.hostname` for `instance` and sets `job_name = "ethtool"`
 
+### Fixed
+
+- Grafana *Physical layer & optics* → **Driver statistics (ethtool -S)** failed on many-queue NICs (e.g. Broadcom BCM57608 / `bnxt_en` with 64 queues, AMD Pollara / `ionic` with 16) with backend limit errors (`query processing would load too many samples into memory`, `err-mimir-max-chunks-per-query`). The default error regex matched ~2,300 per-queue counters per host. A new **Driver stat exclude** variable (default: per-queue / per-ring names `[N]: …`, `rx_N_*`, `tx_N_*`, `*_queue_N_*`) is applied with `stat!~`, cutting the default panel to ~270 series per host; set it to `^$` to restore the old behaviour. The panel also caps `maxDataPoints` at 500.
+
 [Unreleased]: https://github.com/eth-exporter/eth-exporter/commits/main

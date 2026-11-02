@@ -1839,7 +1839,7 @@
     {
       "type": "timeseries",
       "title": "Driver statistics (ethtool -S)",
-      "description": "Driver-specific ETHTOOL_GSTATS counters filtered by the \"Driver stat\" variable. Names vary by driver.",
+      "description": "Driver-specific ETHTOOL_GSTATS counters filtered by the \"Driver stat\" variable and excluding \"Driver stat exclude\". Names vary by driver. Per-queue counters are excluded by default: on NICs with dozens of queues they add thousands of series per host and the panel can fail with the backend's sample/chunk limits.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1850,7 +1850,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(ethtool_nic_statistics{stat=~\"$nic_stat\", job=~\"$job\", instance=~\"$instance\", device=~\"$device\"}[$__rate_interval]) > 0",
+          "expr": "rate(ethtool_nic_statistics{stat=~\"$nic_stat\", stat!~\"$nic_stat_exclude\", job=~\"$job\", instance=~\"$instance\", device=~\"$device\"}[$__rate_interval]) > 0",
           "legendFormat": "{{instance}} {{device}} {{stat}}",
           "range": true,
           "instant": false,
@@ -1915,7 +1915,8 @@
         "w": 24,
         "x": 0,
         "y": 69
-      }
+      },
+      "maxDataPoints": 500
     },
     {
       "type": "row",
@@ -2306,6 +2307,20 @@
         "options": [],
         "skipUrlSync": false,
         "description": "Regular expression applied to ethtool -S counter names."
+      },
+      {
+        "name": "nic_stat_exclude",
+        "label": "Driver stat exclude (regex)",
+        "type": "textbox",
+        "query": "\\[[0-9]+\\].*|(rx|tx)_[0-9]+_.*|.*_(queue|q|ch)_?[0-9]+_.*",
+        "current": {
+          "text": "\\[[0-9]+\\].*|(rx|tx)_[0-9]+_.*|.*_(queue|q|ch)_?[0-9]+_.*",
+          "value": "\\[[0-9]+\\].*|(rx|tx)_[0-9]+_.*|.*_(queue|q|ch)_?[0-9]+_.*"
+        },
+        "hide": 0,
+        "options": [],
+        "skipUrlSync": false,
+        "description": "Driver stat names to drop. Default removes per-queue / per-ring counters (rx_N_*, tx_N_*, [N]: *, *_queue_N_*), which multiply series by the queue count and can exceed query limits on many-queue NICs. Set to ^$ to include everything."
       }
     ]
   },
