@@ -28,4 +28,8 @@ once tagged releases begin.
 
 - `alloy/config.alloy` uses `constants.hostname` for `instance` and sets `job_name = "ethtool"`
 
+### Fixed
+
+- Optics DOM for **CMIS modules** (QSFP-DD, OSFP, QSFP112 and other modules with a CMIS SFF-8024 identifier) is now decoded. Previously the driver-reported `ETHTOOL_GMODULEINFO` type picked the decoder, and drivers such as `ionic` (reports SFF-8472) and `bnxt_en` (reports SFF-8636) report legacy types for CMIS modules, so temperature/voltage read as 0, vendor/part/serial were garbage, and there was no lane data. The identifier byte now takes precedence. Module temperature, voltage and identity come from page 00h, and per-lane Tx/Rx optical power and Tx bias (with the page 01h bias multiplier) come from page 11h via `ETHTOOL_MSG_MODULE_EEPROM_GET`. A dark lane reports -40 dBm instead of 0 dBm. Existing metric names are unchanged; CMIS modules additionally expose `ethtool_module_channel{metric="tx_power_mW"|"rx_power_mW"}`.
+
 [Unreleased]: https://github.com/eth-exporter/eth-exporter/commits/main

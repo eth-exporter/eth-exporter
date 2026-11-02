@@ -203,7 +203,9 @@ Lean profile:
 - `ethtool_privflag_active`, `ethtool_rss_*`
 
 ### Optics (DOM)
-- `ethtool_module_dom_*` — temperature, voltage, bias, TX/RX power, channels
+- `ethtool_module_dom_info`, `ethtool_module_temperature_celsius`, `ethtool_module_voltage_volts`, `ethtool_module_bias_milliamps`, `ethtool_module_tx_power_dbm`, `ethtool_module_rx_power_dbm`
+- `ethtool_module_channel{lane, metric}` — per-lane `bias_mA`, `tx_power_dBm`, `rx_power_dBm` (+ linear `tx_power_mW` / `rx_power_mW` for CMIS modules)
+- Decoders: SFF-8472 (SFP), SFF-8636/8436 (QSFP/QSFP28), and **CMIS** (QSFP-DD, OSFP, QSFP112, …), selected by the SFF-8024 identifier byte rather than the driver-reported module type. CMIS lane monitors (page 11h) and the bias multiplier (page 01h) are read with `ETHTOOL_MSG_MODULE_EEPROM_GET` (kernel ≥ 5.13); without it only module temperature/voltage/identity are reported.
 
 ### Standard / pause / FEC
 - `ethtool_std_statistics`, `ethtool_rmon_hist_packets`

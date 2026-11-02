@@ -114,6 +114,9 @@ func New(opts Options) (*Collector, error) {
 	if err != nil {
 		logger.Warn("ethtool genetlink unavailable; standard/pause/fec stats disabled", "err", err)
 	}
+	if eth != nil && nl != nil {
+		eth.SetModulePageReader(nl) // CMIS page 01h/11h lane monitors
+	}
 	rt, err := rtn.New()
 	if err != nil {
 		logger.Warn("rtnetlink unavailable; address/neighbor/fdb/qdisc metrics disabled", "err", err)
