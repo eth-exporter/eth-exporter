@@ -72,3 +72,11 @@ func (c *Client) ModuleEEPROM(string) (ModuleInfo, []byte, error) {
 func (c *Client) ModuleDOM(string) (ModuleDOM, error) {
 	return ModuleDOM{}, fmt.Errorf("unsupported platform")
 }
+
+// ModulePageReader reads one 128-byte half page of module EEPROM (netlink).
+type ModulePageReader interface {
+	ModuleEEPROMPage(dev string, page, bank, i2c uint8, offset, length uint32) ([]byte, error)
+}
+
+// SetModulePageReader is a no-op on non-Linux platforms.
+func (c *Client) SetModulePageReader(ModulePageReader) {}

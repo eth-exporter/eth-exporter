@@ -47,8 +47,9 @@ const (
 
 // Client performs ethtool ioctl requests against the kernel.
 type Client struct {
-	fd int
-	mu sync.Mutex
+	fd    int
+	mu    sync.Mutex
+	pages ModulePageReader
 }
 
 func New() (*Client, error) {
@@ -543,6 +544,12 @@ func (c *Client) ModuleEEPROM(name string) (ModuleInfo, []byte, error) {
 }
 
 // ModuleDOM reads and decodes optical diagnostics for a device.
+//
+// For CMIS modules the legacy ioctl only exposes page 00h, so per-lane
+// monitors (page 11h) and the bias multiplier (page 01h) are fetched with
+// ETHTOOL_MSG_MODULE_EEPROM_GET when a netlink client is supplied via
+// SetModulePageReader. Failure to read the extra pages is not an error: the
+// module-level temperature/voltage/identity from page 00h are still returned.
 func (c *Client) ModuleDOM(name string) (ModuleDOM, error) {
 	info, data, err := c.ModuleEEPROM(name)
 	if err != nil {
@@ -551,8 +558,24 @@ func (c *Client) ModuleDOM(name string) (ModuleDOM, error) {
 	if len(data) == 0 {
 		return ModuleDOM{}, fmt.Errorf("empty module EEPROM")
 	}
-	return ParseModuleDOM(info.Type, data), nil
+	dom := ParseModuleDOM(info.Type, data)
+	if dom.CMIS && !dom.FlatMemory && c.pages != nil {
+		p11, err11 := c.pages.ModuleEEPROMPage(name, 0x11, 0, 0x50, 128, 128)
+		if err11 == nil && len(p11) >= 128 {
+			p01, _ := c.pages.ModuleEEPROMPage(name, 0x01, 0, 0x50, 128, 128)
+			ApplyCMISLaneMonitors(&dom, p01, p11)
+		}
+	}
+	return dom, nil
 }
+
+// ModulePageReader reads one 128-byte half page of module EEPROM (netlink).
+type ModulePageReader interface {
+	ModuleEEPROMPage(dev string, page, bank, i2c uint8, offset, length uint32) ([]byte, error)
+}
+
+// SetModulePageReader enables paged (CMIS page 01h/11h) module reads.
+func (c *Client) SetModulePageReader(r ModulePageReader) { c.pages = r }
 
 // Features returns named feature bits via ETHTOOL_GFEATURES + string set.
 func (c *Client) Features(name string) (map[string]FeatureState, error) {

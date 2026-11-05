@@ -397,7 +397,7 @@ func (c *Collector) collectDeviceExtra(ch chan<- prometheus.Metric, name string)
 		})
 		if err == nil {
 			ch <- prometheus.MustNewConstMetric(c.extra.moduleInfoDOM, prometheus.GaugeValue, 1,
-				name, dom.Vendor, dom.PartNumber, dom.Serial, strconv.FormatUint(uint64(dom.Type), 10))
+				name, utf8Label(dom.Vendor), utf8Label(dom.PartNumber), utf8Label(dom.Serial), strconv.FormatUint(uint64(dom.Type), 10))
 			if dom.HasTemperature {
 				ch <- prometheus.MustNewConstMetric(c.extra.moduleTemp, prometheus.GaugeValue, dom.TemperatureC, name)
 			}
@@ -418,6 +418,11 @@ func (c *Collector) collectDeviceExtra(ch chan<- prometheus.Metric, name string)
 				ch <- prometheus.MustNewConstMetric(c.extra.moduleChan, prometheus.GaugeValue, chn.BiasmA, name, lane, "bias_mA")
 				ch <- prometheus.MustNewConstMetric(c.extra.moduleChan, prometheus.GaugeValue, chn.TxPowerdBm, name, lane, "tx_power_dBm")
 				ch <- prometheus.MustNewConstMetric(c.extra.moduleChan, prometheus.GaugeValue, chn.RxPowerdBm, name, lane, "rx_power_dBm")
+				if dom.CMIS {
+					// Linear readings are exact (0 = no light), unlike the clamped dBm values.
+					ch <- prometheus.MustNewConstMetric(c.extra.moduleChan, prometheus.GaugeValue, chn.TxPowermW, name, lane, "tx_power_mW")
+					ch <- prometheus.MustNewConstMetric(c.extra.moduleChan, prometheus.GaugeValue, chn.RxPowermW, name, lane, "rx_power_mW")
+				}
 			}
 		}
 	}
