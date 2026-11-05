@@ -13,8 +13,17 @@ const (
 )
 
 // ParseModuleDOM extracts identity + DOM from an ethtool module EEPROM blob.
+//
+// The SFF-8024 identifier in byte 0 wins over the driver-reported module type
+// for CMIS modules (QSFP-DD/OSFP/QSFP112...): several drivers report a legacy
+// SFF-8472/SFF-8636 type for them, which would decode the wrong offsets. Lane
+// monitors for CMIS live on page 11h; see ApplyCMISLaneMonitors.
 func ParseModuleDOM(modType uint32, data []byte) ModuleDOM {
 	dom := ModuleDOM{Type: modType}
+	if IsCMIS(data) {
+		parseCMIS(&dom, data)
+		return dom
+	}
 	switch modType {
 	case moduleSFF8472:
 		parseSFF8472(&dom, data)

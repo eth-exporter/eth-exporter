@@ -60,6 +60,13 @@ type ModuleDOM struct {
 	HasTxPower     bool
 	HasRxPower     bool
 	Channels       []ChannelDOM
+	// CMIS is true when byte 0 carries a CMIS SFF-8024 identifier
+	// (QSFP-DD, OSFP, QSFP112...). MediaLanes is the media lane count of the
+	// first advertised application; FlatMemory means no paged memory (no
+	// page 11h lane monitors).
+	CMIS       bool
+	MediaLanes int
+	FlatMemory bool
 }
 
 // ChannelDOM is per-lane QSFP diagnostics.
@@ -68,4 +75,8 @@ type ChannelDOM struct {
 	BiasmA     float64
 	TxPowerdBm float64
 	RxPowerdBm float64
+	// TxPowermW/RxPowermW are the linear readings (set by the CMIS decoder);
+	// 0 means unknown for non-CMIS decoders.
+	TxPowermW float64
+	RxPowermW float64
 }
